@@ -42,7 +42,7 @@ static void rtl_run()
             // do nothing
             break;
         case Land:
-            // do nothing
+            // do nothing - rtl_land_run will take care of disarming motors
             break;
         }
     }
@@ -225,8 +225,17 @@ static void rtl_loiterathome_run()
     }
 
     // check if we've completed this stage of RTL
-    // To-Do: add extra check that we've reached the target yaw
-    rtl_state_complete = ((millis() - rtl_loiter_start_time) > (uint32_t)g.rtl_loiter_time.get());
+    if ((millis() - rtl_loiter_start_time) >= (uint32_t)g.rtl_loiter_time.get()) {
+        if (auto_yaw_mode == AUTO_YAW_RESETTOARMEDYAW) {
+            // check if heading is within 2 degrees of heading when vehicle was armed
+            if (labs(wrap_180_cd(ahrs.yaw_sensor-initial_armed_bearing)) <= 200) {
+                rtl_state_complete = true;
+            }
+        } else {
+            // we have loitered long enough
+            rtl_state_complete = true;
+        }
+    }
 }
 
 // rtl_loiterathome_start - initialise controllers to loiter over home
@@ -278,6 +287,18 @@ static void rtl_land_run()
 
     // check if we've completed this stage of RTL
     rtl_state_complete = ap.land_complete;
+
+#if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
+    // disarm when the landing detector says we've landed and throttle is at minimum
+    if (ap.land_complete && (g.rc_3.control_in == 0 || failsafe.radio)) {
+        init_disarm_motors();
+    }
+#else
+    // disarm when the landing detector says we've landed
+    if (ap.land_complete) {
+        init_disarm_motors();
+    }
+#endif
 }
 
 // get_RTL_alt - return altitude which vehicle should return home at
