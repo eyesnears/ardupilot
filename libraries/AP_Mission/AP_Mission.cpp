@@ -476,6 +476,12 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
         cmd.content.location.flags.loiter_ccw = (packet.param3 < 0);
         break;
 
+    case MAV_CMD_NAV_LOITER_DESCEND:
+        copy_location = true;
+        cmd.p1 = fabsf(packet.param3); // radius in meters
+        cmd.content.location.flags.loiter_ccw = (packet.param3 < 0);
+        break;
+
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:                  // MAV ID: 20
         copy_location = true;
         break;
@@ -737,6 +743,14 @@ bool AP_Mission::mission_cmd_to_mavlink(const AP_Mission::Mission_Command& cmd, 
             packet.param3 = -1;
         }else{
             packet.param3 = 1;
+        }
+        break;
+
+    case MAV_CMD_NAV_LOITER_DESCEND:
+        copy_location = true;
+        packet.param3 = cmd.p1;                         // radius in meters
+        if (cmd.content.location.flags.loiter_ccw) {
+            packet.param3 *= -1;
         }
         break;
 
