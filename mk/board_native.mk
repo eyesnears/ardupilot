@@ -7,7 +7,7 @@ include $(MK_DIR)/find_tools.mk
 #
 DEFINES         =   -DF_CPU=$(F_CPU)
 DEFINES        +=   -DSKETCH=\"$(SKETCH)\" -DSKETCHNAME="\"$(SKETCH)\"" -DSKETCHBOOK="\"$(SKETCHBOOK)\"" -DAPM_BUILD_DIRECTORY=APM_BUILD_$(SKETCH)
-DEFINES        +=   $(EXTRAFLAGS) # from user config.mk
+DEFINES        +=   $(EXTRAFLAGS)
 DEFINES        +=   -DCONFIG_HAL_BOARD=$(HAL_BOARD) -DCONFIG_HAL_BOARD_SUBTYPE=$(HAL_BOARD_SUBTYPE)
 WARNFLAGS       =   -Wformat -Wall -Wshadow -Wpointer-arith -Wcast-align -Wno-unused-parameter -Wno-missing-field-initializers
 WARNFLAGS      +=   -Wwrite-strings -Wformat=2
@@ -29,7 +29,7 @@ CPULDFLAGS   = -g
 OPTFLAGS     ?= -O3 -g
 
 CXXFLAGS        =   -g $(CPUFLAGS) $(DEFINES) $(OPTFLAGS)
-CXXFLAGS       +=   $(WARNFLAGS) $(WARNFLAGSCXX) $(DEPFLAGS) $(CXXOPTS)
+CXXFLAGS       +=   -std=gnu++11 $(WARNFLAGS) $(WARNFLAGSCXX) $(DEPFLAGS) $(CXXOPTS)
 CFLAGS          =   -g $(CPUFLAGS) $(DEFINES) -Wa,$(LISTOPTS) $(OPTFLAGS)
 CFLAGS         +=   $(WARNFLAGS) $(DEPFLAGS) $(COPTS)
 ASFLAGS         =   -g $(CPUFLAGS) $(DEFINES) -Wa,$(LISTOPTS) $(DEPFLAGS)
@@ -41,6 +41,9 @@ LDFLAGS        +=   -Wl,--gc-sections -Wl,-Map -Wl,$(SKETCHMAP)
 endif
 
 LIBS ?= -lm -lpthread
+ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
+LIBS += -lwinmm
+endif
 
 ifeq ($(VERBOSE),)
 v = @

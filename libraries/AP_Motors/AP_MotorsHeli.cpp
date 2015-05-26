@@ -204,6 +204,10 @@ const AP_Param::GroupInfo AP_MotorsHeli::var_info[] PROGMEM = {
     // @User: Standard
     AP_GROUPINFO("TAIL_SPEED", 21, AP_MotorsHeli,  _direct_drive_tailspeed, AP_MOTOR_HELI_DDTAIL_DEFAULT),
 
+    // parameters 1 ~ 29 reserved for tradheli
+    // parameters 30 ~ 39 reserved for tricopter
+    // parameters 40 ~ 49 for single copter and coax copter (these have identical parameter files)
+
     AP_GROUPEND
 };
 
@@ -257,6 +261,25 @@ void AP_MotorsHeli::enable()
     hal.rcout->enable_ch(AP_MOTORS_HELI_AUX);                               // output for gyro gain or direct drive variable pitch tail motor
     hal.rcout->enable_ch(AP_MOTORS_HELI_RSC);                               // output for main rotor esc
 }
+
+// output - sends commands to the servos
+void AP_MotorsHeli::output()
+{
+    // update throttle filter
+    update_throttle_filter();
+
+    if (_flags.armed) {
+        if (!_flags.interlock) {
+            output_armed_zero_throttle();
+        } else if (_flags.stabilizing) {
+            output_armed_stabilizing();
+        } else {
+            output_armed_not_stabilizing();
+        }
+    } else {
+        output_disarmed();
+    }
+};
 
 // output_min - sets servos to neutral point
 void AP_MotorsHeli::output_min()
@@ -384,18 +407,13 @@ void AP_MotorsHeli::output_armed_stabilizing()
 {
     // if manual override (i.e. when setting up swash), pass pilot commands straight through to swash
     if (_servo_manual == 1) {
-        _rc_roll.servo_out = _rc_roll.control_in;
-        _rc_pitch.servo_out = _rc_pitch.control_in;
-        _rc_throttle.servo_out = _rc_throttle.control_in;
-        _rc_yaw.servo_out = _rc_yaw.control_in;
+        _roll_control_input = _roll_radio_passthrough;
+        _pitch_control_input = _pitch_radio_passthrough;
+        _throttle_control_input = _throttle_radio_passthrough;
+        _yaw_control_input = _yaw_radio_passthrough;
     }
 
-    _rc_roll.calc_pwm();
-    _rc_pitch.calc_pwm();
-    _rc_throttle.calc_pwm();
-    _rc_yaw.calc_pwm();
-
-    move_swash(_rc_roll.servo_out, _rc_pitch.servo_out, _rc_throttle.servo_out, _rc_yaw.servo_out);
+    move_swash(_roll_control_input, _pitch_control_input, _throttle_control_input, _yaw_control_input);
 
     // update rotor and direct drive esc speeds
     rsc_control();
@@ -437,7 +455,7 @@ void AP_MotorsHeli::reset_swash()
     // set roll, pitch and throttle scaling
     _roll_scaler = 1.0f;
     _pitch_scaler = 1.0f;
-    _collective_scalar = ((float)(_rc_throttle.radio_max - _rc_throttle.radio_min))/1000.0f;
+    _collective_scalar = ((float)(_throttle_radio_max - _throttle_radio_min))/1000.0f;
 	_collective_scalar_manual = 1.0f;
 
     // we must be in set-up mode so mark swash as uninitialised
@@ -549,7 +567,7 @@ void AP_MotorsHeli::move_swash(int16_t roll_out, int16_t pitch_out, int16_t coll
         }
         // To-Do:  This equation seems to be wrong.  It probably restricts swash movement so that swash setup doesn't work right.
         // _collective_scalar should probably not be used or set to 1?
-        coll_out_scaled = coll_in * _collective_scalar + _rc_throttle.radio_min - 1000;
+        coll_out_scaled = coll_in * _collective_scalar + _throttle_radio_min - 1000;
     }else{      // regular flight mode
 
         // check if we need to reinitialise the swash
@@ -819,4 +837,31 @@ void AP_MotorsHeli::set_delta_phase_angle(int16_t angle)
     angle = constrain_int16(angle, -90, 90);
     _delta_phase_angle = angle;
     calculate_roll_pitch_collective_factors();
+}
+
+// update the throttle input filter
+void AP_MotorsHeli::update_throttle_filter()
+{
+    _throttle_filter.apply(_throttle_in, 1.0f/_loop_rate);
+
+    // prevent _rc_throttle.servo_out from wrapping at int16 max or min
+    _throttle_control_input = constrain_float(_throttle_filter.get(),-32000,32000);
+}
+
+// set_radio_passthrough used to pass radio inputs directly to outputs
+void AP_MotorsHeli::set_radio_passthrough(int16_t radio_roll_input, int16_t radio_pitch_input, int16_t radio_throttle_input, int16_t radio_yaw_input)
+{
+    _roll_radio_passthrough = radio_roll_input;
+    _pitch_radio_passthrough = radio_pitch_input;
+    _throttle_radio_passthrough = radio_throttle_input;
+    _yaw_radio_passthrough = radio_yaw_input;
+}
+
+// reset_radio_passthrough used to reset all radio inputs to center
+void AP_MotorsHeli::reset_radio_passthrough()
+{
+    _roll_radio_passthrough = 0;
+    _pitch_radio_passthrough = 0;
+    _throttle_radio_passthrough = 500;
+    _yaw_radio_passthrough = 0;
 }

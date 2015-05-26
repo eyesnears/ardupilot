@@ -8,14 +8,14 @@ include $(MK_DIR)/find_tools.mk
 #
 DEFINES         =   -DF_CPU=$(F_CPU)
 DEFINES        +=   -DSKETCH=\"$(SKETCH)\" -DAPM_BUILD_DIRECTORY=APM_BUILD_$(SKETCH)
-DEFINES        +=   $(EXTRAFLAGS) # from user config.mk
+DEFINES        +=   $(EXTRAFLAGS)
 DEFINES        +=   -DCONFIG_HAL_BOARD=$(HAL_BOARD)
 WARNFLAGS       =   -Wformat -Wall -Wshadow -Wpointer-arith -Wcast-align
 WARNFLAGS      +=   -Wwrite-strings -Wformat=2 -Wno-unused-parameter -Wno-missing-field-initializers
 WARNFLAGSCXX    =   -Wno-reorder
 DEPFLAGS        =   -MD -MT $@
 
-CXXOPTS         =   -ffunction-sections -fdata-sections -fno-exceptions -fsigned-char
+CXXOPTS         =   -ffunction-sections -fdata-sections -fno-exceptions -fsigned-char -fno-use-cxa-atexit
 COPTS           =   -ffunction-sections -fdata-sections -fsigned-char
 
 ASOPTS          =   -x assembler-with-cpp 
@@ -34,7 +34,7 @@ CPULDFLAGS= $($(TOOLCHAIN)_CPULDFLAGS)
 OPTFLAGS= $($(TOOLCHAIN)_OPTFLAGS)
 
 CXXFLAGS        =   -g $(CPUFLAGS) $(DEFINES) -Wa,$(LISTOPTS) $(OPTFLAGS)
-CXXFLAGS       +=   $(WARNFLAGS) $(WARNFLAGSCXX) $(DEPFLAGS) $(CXXOPTS)
+CXXFLAGS       +=   -std=gnu++11 $(WARNFLAGS) $(WARNFLAGSCXX) $(DEPFLAGS) $(CXXOPTS)
 CFLAGS          =   -g $(CPUFLAGS) $(DEFINES) -Wa,$(LISTOPTS) $(OPTFLAGS)
 CFLAGS         +=   $(WARNFLAGS) $(DEPFLAGS) $(COPTS)
 ASFLAGS         =   -g $(CPUFLAGS) $(DEFINES) -Wa,$(LISTOPTS) $(DEPFLAGS)
@@ -64,6 +64,9 @@ endif
 
 # Library object files
 LIBOBJS			:=	$(SKETCHLIBOBJS)
+
+HARDWARE ?= arduino
+BOARD ?= mega2560
 
 # Find the hardware directory to use
 HARDWARE_DIR		:=	$(firstword $(wildcard $(SKETCHBOOK)/hardware/$(HARDWARE) \

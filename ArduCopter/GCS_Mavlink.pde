@@ -397,7 +397,7 @@ static void NOINLINE send_vfr_hud(mavlink_channel_t chan)
         gps.ground_speed(),
         gps.ground_speed(),
         (ahrs.yaw_sensor / 100) % 360,
-        g.rc_3.servo_out/10,
+        (int16_t)(motors.get_throttle())/10,
         current_loc.alt / 100.0f,
         climb_rate / 100.0f);
 }
@@ -1149,7 +1149,8 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             break;
 
         case MAV_CMD_MISSION_START:
-            if (set_mode(AUTO)) {
+            if (motors.armed() && set_mode(AUTO)) {
+                set_auto_armed(true);
                 result = MAV_RESULT_ACCEPTED;
             }
             break;
@@ -1223,7 +1224,7 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
                 if (init_arm_motors(true)) {
                     result = MAV_RESULT_ACCEPTED;
                 }
-            } else if (is_zero(packet.param1) && (mode_has_manual_throttle(control_mode) || ap.land_complete))  {
+            } else if (is_zero(packet.param1) && (mode_has_manual_throttle(control_mode) || ap.land_complete || is_equal(packet.param2,21196.0f)))  {
                 init_disarm_motors();
                 result = MAV_RESULT_ACCEPTED;
             } else {

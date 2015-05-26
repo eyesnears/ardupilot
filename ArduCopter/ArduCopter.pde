@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "APM:Copter V3.3-rc4"
+#define THISFIRMWARE "APM:Copter V3.4-dev"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -209,6 +209,12 @@ static uint8_t command_ack_counter;
 
 // has a log download started?
 static bool in_log_download;
+
+// primary input control channels
+static RC_Channel *channel_roll;
+static RC_Channel *channel_pitch;
+static RC_Channel *channel_throttle;
+static RC_Channel *channel_yaw;
 
 ////////////////////////////////////////////////////////////////////////////////
 // prototypes
@@ -422,15 +428,15 @@ static struct {
 #endif
 
 #if FRAME_CONFIG == HELI_FRAME  // helicopter constructor requires more arguments
-static MOTOR_CLASS motors(g.rc_1, g.rc_2, g.rc_3, g.rc_4, g.rc_7, g.rc_8, g.heli_servo_1, g.heli_servo_2, g.heli_servo_3, g.heli_servo_4, MAIN_LOOP_RATE);
+static MOTOR_CLASS motors(g.rc_7, g.rc_8, g.heli_servo_1, g.heli_servo_2, g.heli_servo_3, g.heli_servo_4, MAIN_LOOP_RATE);
 #elif FRAME_CONFIG == TRI_FRAME  // tri constructor requires additional rc_7 argument to allow tail servo reversing
-static MOTOR_CLASS motors(g.rc_1, g.rc_2, g.rc_3, g.rc_4, g.rc_7, MAIN_LOOP_RATE);
+static MOTOR_CLASS motors(MAIN_LOOP_RATE);
 #elif FRAME_CONFIG == SINGLE_FRAME  // single constructor requires extra servos for flaps
-static MOTOR_CLASS motors(g.rc_1, g.rc_2, g.rc_3, g.rc_4, g.single_servo_1, g.single_servo_2, g.single_servo_3, g.single_servo_4, MAIN_LOOP_RATE);
+static MOTOR_CLASS motors(g.single_servo_1, g.single_servo_2, g.single_servo_3, g.single_servo_4, MAIN_LOOP_RATE);
 #elif FRAME_CONFIG == COAX_FRAME  // single constructor requires extra servos for flaps
-static MOTOR_CLASS motors(g.rc_1, g.rc_2, g.rc_3, g.rc_4, g.single_servo_1, g.single_servo_2, MAIN_LOOP_RATE);
+static MOTOR_CLASS motors(g.single_servo_1, g.single_servo_2, MAIN_LOOP_RATE);
 #else
-static MOTOR_CLASS motors(g.rc_1, g.rc_2, g.rc_3, g.rc_4, MAIN_LOOP_RATE);
+static MOTOR_CLASS motors(MAIN_LOOP_RATE);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -727,8 +733,8 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { read_aux_switches,    40,     50 },   // 5
     { arm_motors_check,     40,     50 },   // 6
     { auto_trim,            40,     75 },   // 7
-    { run_nav_updates,       8,    100 },   // 8
-    { update_altitude,      40,    140 },   // 9
+    { update_altitude,      40,    140 },   // 8
+    { run_nav_updates,       8,    100 },   // 9
     { update_thr_average,    4,     90 },   // 10
     { three_hz_loop,       133,     75 },   // 11
     { compass_accumulate,    8,    100 },   // 12
@@ -744,7 +750,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { lost_vehicle_check,   40,     50 },   // 19
     { gcs_check_input,       1,    180 },   // 20
     { gcs_send_heartbeat,  400,    110 },   // 21
-    { gcs_send_deferred,     8,    120 },   // 22
+    { gcs_send_deferred,     8,    550 },   // 22
     { gcs_data_stream_send,  8,    550 },   // 23
     { update_mount,          8,     75 },   // 24
     { ten_hz_logging_loop,  40,    350 },   // 25
@@ -949,7 +955,7 @@ static void update_batt_compass(void)
 
     if(g.compass_enabled) {
         // update compass with throttle value - used for compassmot
-        compass.set_throttle((float)g.rc_3.servo_out/1000.0f);
+        compass.set_throttle(motors.get_throttle()/1000.0f);
         compass.read();
         // log compass information
         if (should_log(MASK_LOG_COMPASS)) {
@@ -1059,6 +1065,9 @@ static void one_hz_loop()
 
         // check the user hasn't updated the frame orientation
         motors.set_frame_orientation(g.frame_orientation);
+
+        // set all throttle channel settings
+        motors.set_throttle_range(g.throttle_min, channel_throttle->radio_min, channel_throttle->radio_max);
     }
 
     // update assigned functions and enable auxiliar servos
@@ -1157,17 +1166,17 @@ void update_simple_mode(void)
 
     if (ap.simple_mode == 1) {
         // rotate roll, pitch input by -initial simple heading (i.e. north facing)
-        rollx = g.rc_1.control_in*simple_cos_yaw - g.rc_2.control_in*simple_sin_yaw;
-        pitchx = g.rc_1.control_in*simple_sin_yaw + g.rc_2.control_in*simple_cos_yaw;
+        rollx = channel_roll->control_in*simple_cos_yaw - channel_pitch->control_in*simple_sin_yaw;
+        pitchx = channel_roll->control_in*simple_sin_yaw + channel_pitch->control_in*simple_cos_yaw;
     }else{
         // rotate roll, pitch input by -super simple heading (reverse of heading to home)
-        rollx = g.rc_1.control_in*super_simple_cos_yaw - g.rc_2.control_in*super_simple_sin_yaw;
-        pitchx = g.rc_1.control_in*super_simple_sin_yaw + g.rc_2.control_in*super_simple_cos_yaw;
+        rollx = channel_roll->control_in*super_simple_cos_yaw - channel_pitch->control_in*super_simple_sin_yaw;
+        pitchx = channel_roll->control_in*super_simple_sin_yaw + channel_pitch->control_in*super_simple_cos_yaw;
     }
 
     // rotate roll, pitch input from north facing to vehicle's perspective
-    g.rc_1.control_in = rollx*ahrs.cos_yaw() + pitchx*ahrs.sin_yaw();
-    g.rc_2.control_in = -rollx*ahrs.sin_yaw() + pitchx*ahrs.cos_yaw();
+    channel_roll->control_in = rollx*ahrs.cos_yaw() + pitchx*ahrs.sin_yaw();
+    channel_pitch->control_in = -rollx*ahrs.sin_yaw() + pitchx*ahrs.cos_yaw();
 }
 
 // update_super_simple_bearing - adjusts simple bearing based on location

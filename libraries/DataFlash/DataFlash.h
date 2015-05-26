@@ -6,12 +6,14 @@
 #ifndef DataFlash_h
 #define DataFlash_h
 
+#include <AP_HAL.h>
 #include <AP_Common.h>
 #include <AP_Param.h>
 #include <AP_GPS.h>
 #include <AP_InertialSensor.h>
 #include <AP_Baro.h>
 #include <AP_AHRS.h>
+#include <AP_Vehicle.h>
 #include "../AP_Airspeed/AP_Airspeed.h"
 #include "../AP_BattMonitor/AP_BattMonitor.h"
 #include <stdint.h>
@@ -28,6 +30,12 @@
 class DataFlash_Class
 {
 public:
+#if APM_BUILD_FUNCTOR
+    FUNCTOR_TYPEDEF(print_mode_fn, void, AP_HAL::BetterStream*, uint8_t);
+#else
+    typedef void (*print_mode_fn)(AP_HAL::BetterStream *, uint8_t);
+#endif
+
     // initialisation
     virtual void Init(const struct LogStructure *structure, uint8_t num_types);
     virtual bool CardInserted(void) = 0;
@@ -48,7 +56,7 @@ public:
 #ifndef DATAFLASH_NO_CLI
     virtual void LogReadProcess(uint16_t log_num,
                                 uint16_t start_page, uint16_t end_page, 
-                                void (*printMode)(AP_HAL::BetterStream *port, uint8_t mode),
+                                print_mode_fn printMode,
                                 AP_HAL::BetterStream *port) = 0;
     virtual void DumpPageInfo(AP_HAL::BetterStream *port) = 0;
     virtual void ShowDeviceInfo(AP_HAL::BetterStream *port) = 0;
@@ -98,7 +106,7 @@ protected:
     read and print a log entry using the format strings from the given structure
     */
     void _print_log_entry(uint8_t msg_type, 
-                          void (*print_mode)(AP_HAL::BetterStream *port, uint8_t mode),
+                          print_mode_fn print_mode,
                           AP_HAL::BetterStream *port);
     
     void Log_Fill_Format(const struct LogStructure *structure, struct log_Format &pkt);
@@ -657,17 +665,17 @@ Format characters in the format string for binary log messages
     { LOG_COMPASS3_MSG, sizeof(log_Compass), \
       "MAG3","IhhhhhhhhhB",    "TimeMS,MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ,Health" }, \
     { LOG_ACC1_MSG, sizeof(log_ACCEL), \
-      "ACC1", "IIfff",        "TimeMS,TimeUS,AccX,AccY,AccZ" }, \
+      "ACC1", "IIfff",        "TimeMS,SampleUS,AccX,AccY,AccZ" }, \
     { LOG_ACC2_MSG, sizeof(log_ACCEL), \
-      "ACC2", "IIfff",        "TimeMS,TimeUS,AccX,AccY,AccZ" }, \
+      "ACC2", "IIfff",        "TimeMS,SampleUS,AccX,AccY,AccZ" }, \
     { LOG_ACC3_MSG, sizeof(log_ACCEL), \
-      "ACC3", "IIfff",        "TimeMS,TimeUS,AccX,AccY,AccZ" }, \
+      "ACC3", "IIfff",        "TimeMS,SampleUS,AccX,AccY,AccZ" }, \
     { LOG_GYR1_MSG, sizeof(log_GYRO), \
-      "GYR1", "IIfff",        "TimeMS,TimeUS,GyrX,GyrY,GyrZ" }, \
+      "GYR1", "IIfff",        "TimeMS,SampleUS,GyrX,GyrY,GyrZ" }, \
     { LOG_GYR2_MSG, sizeof(log_GYRO), \
-      "GYR2", "IIfff",        "TimeMS,TimeUS,GyrX,GyrY,GyrZ" }, \
+      "GYR2", "IIfff",        "TimeMS,SampleUS,GyrX,GyrY,GyrZ" }, \
     { LOG_GYR3_MSG, sizeof(log_GYRO), \
-      "GYR3", "IIfff",        "TimeMS,TimeUS,GyrX,GyrY,GyrZ" }
+      "GYR3", "IIfff",        "TimeMS,SampleUS,GyrX,GyrY,GyrZ" }
 
 #if HAL_CPU_CLASS >= HAL_CPU_CLASS_75
 #define LOG_COMMON_STRUCTURES LOG_BASE_STRUCTURES, LOG_EXTRA_STRUCTURES
