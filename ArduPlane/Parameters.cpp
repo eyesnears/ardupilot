@@ -70,6 +70,13 @@ const AP_Param::Info Plane::var_info[] PROGMEM = {
     // @Increment: 1
     GSCALAR(telem_delay,            "TELEM_DELAY",     0),
 
+    // @Param: GCS_PID_MASK
+    // @DisplayName: GCS PID tuning mask
+    // @Description: bitmask of PIDs to send MAVLink PID_TUNING messages for
+    // @User: Advanced
+    // @Values: 0:None,1:Roll,2:Pitch,4:Yaw
+    GSCALAR(gcs_pid_mask,           "GCS_PID_MASK",     0),
+
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
     // @Description: The amount of rudder mix to apply during aileron movement 0 = 0 %, 1 = 100%
@@ -1183,7 +1190,7 @@ const AP_Param::Info Plane::var_info[] PROGMEM = {
 #if AP_AHRS_NAVEKF_AVAILABLE
     // @Group: EKF_
     // @Path: ../libraries/AP_NavEKF/AP_NavEKF.cpp
-    GOBJECTN(ahrs.get_NavEKF_const(), NavEKF, "EKF_", NavEKF),
+    GOBJECTN(EKF, NavEKF, "EKF_", NavEKF),
 #endif
 
     AP_VAREND

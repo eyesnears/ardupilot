@@ -160,7 +160,7 @@ void Rover::do_erase_logs(void)
 
 struct PACKED log_Performance {
     LOG_PACKET_HEADER;
-    uint32_t time_ms;
+    uint64_t time_us;
     uint32_t loop_time;
     uint16_t main_loop_count;
     uint32_t g_dt_max;
@@ -176,7 +176,7 @@ void Rover::Log_Write_Performance()
 {
     struct log_Performance pkt = {
         LOG_PACKET_HEADER_INIT(LOG_PERFORMANCE_MSG),
-        time_ms         : millis(),
+        time_us         : hal.scheduler->micros64(),
         loop_time       : millis()- perf_mon_timer,
         main_loop_count : mainLoop_count,
         g_dt_max        : G_Dt_max,
@@ -199,7 +199,7 @@ void Rover::Log_Write_Cmd(const AP_Mission::Mission_Command &cmd)
 
 struct PACKED log_Steering {
     LOG_PACKET_HEADER;
-    uint32_t time_ms;
+    uint64_t time_us;
     float demanded_accel;
     float achieved_accel;
 };
@@ -209,7 +209,7 @@ void Rover::Log_Write_Steering()
 {
     struct log_Steering pkt = {
         LOG_PACKET_HEADER_INIT(LOG_STEERING_MSG),
-        time_ms        : hal.scheduler->millis(),
+        time_us        : hal.scheduler->micros64(),
         demanded_accel : lateral_acceleration,
         achieved_accel : gps.ground_speed() * ins.get_gyro().z,
     };
@@ -218,23 +218,28 @@ void Rover::Log_Write_Steering()
 
 struct PACKED log_Startup {
     LOG_PACKET_HEADER;
-    uint32_t time_ms;
+    uint64_t time_us;
     uint8_t startup_type;
     uint16_t command_total;
 };
 
 void Rover::Log_Write_Startup(uint8_t type)
 {
+    // Write all current parameters
+    DataFlash.Log_Write_Parameters();
+
     struct log_Startup pkt = {
         LOG_PACKET_HEADER_INIT(LOG_STARTUP_MSG),
-        time_ms         : millis(),
+        time_us         : hal.scheduler->micros64(),
         startup_type    : type,
         command_total   : mission.num_commands()
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 
     // write all commands to the dataflash as well
-    Log_Write_EntireMission();
+    if (should_log(MASK_LOG_CMD)) {
+        Log_Write_EntireMission();
+    }
 }
 
 void Rover::Log_Write_EntireMission()
@@ -251,7 +256,7 @@ void Rover::Log_Write_EntireMission()
 
 struct PACKED log_Control_Tuning {
     LOG_PACKET_HEADER;
-    uint32_t time_ms;
+    uint64_t time_us;
     int16_t steer_out;
     int16_t roll;
     int16_t pitch;
@@ -265,7 +270,7 @@ void Rover::Log_Write_Control_Tuning()
     Vector3f accel = ins.get_accel();
     struct log_Control_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_CTUN_MSG),
-        time_ms         : millis(),
+        time_us         : hal.scheduler->micros64(),
         steer_out       : (int16_t)channel_steer->servo_out,
         roll            : (int16_t)ahrs.roll_sensor,
         pitch           : (int16_t)ahrs.pitch_sensor,
@@ -277,7 +282,7 @@ void Rover::Log_Write_Control_Tuning()
 
 struct PACKED log_Nav_Tuning {
     LOG_PACKET_HEADER;
-    uint32_t time_ms;
+    uint64_t time_us;
     uint16_t yaw;
     float    wp_distance;
     uint16_t target_bearing_cd;
@@ -290,7 +295,7 @@ void Rover::Log_Write_Nav_Tuning()
 {
     struct log_Nav_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_NTUN_MSG),
-        time_ms             : millis(),
+        time_us             : hal.scheduler->micros64(),
         yaw                 : (uint16_t)ahrs.yaw_sensor,
         wp_distance         : wp_distance,
         target_bearing_cd   : (uint16_t)nav_controller->target_bearing_cd(),
@@ -320,7 +325,7 @@ void Rover::Log_Write_Attitude()
 
 struct PACKED log_Sonar {
     LOG_PACKET_HEADER;
-    uint32_t time_ms;
+    uint64_t time_us;
     float    lateral_accel;
     uint16_t sonar1_distance;
     uint16_t sonar2_distance;
@@ -340,7 +345,7 @@ void Rover::Log_Write_Sonar()
     }
     struct log_Sonar pkt = {
         LOG_PACKET_HEADER_INIT(LOG_SONAR_MSG),
-        time_ms         : millis(),
+        time_us         : hal.scheduler->micros64(),
         lateral_accel   : lateral_acceleration,
         sonar1_distance : (uint16_t)sonar.distance_cm(0),
         sonar2_distance : (uint16_t)sonar.distance_cm(1),
@@ -375,17 +380,17 @@ void Rover::Log_Write_Baro(void)
 const LogStructure Rover::log_structure[] PROGMEM = {
     LOG_COMMON_STRUCTURES,
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance), 
-      "PM",  "IIHIhhhBH", "TimeMS,LTime,MLC,gDt,GDx,GDy,GDz,I2CErr,INSErr" },
+      "PM",  "QIHIhhhBH", "TimeUS,LTime,MLC,gDt,GDx,GDy,GDz,I2CErr,INSErr" },
     { LOG_STARTUP_MSG, sizeof(log_Startup),         
-      "STRT", "IBH",        "TimeMS,SType,CTot" },
+      "STRT", "QBH",        "TimeUS,SType,CTot" },
     { LOG_CTUN_MSG, sizeof(log_Control_Tuning),     
-      "CTUN", "Ihcchf",     "TimeMS,Steer,Roll,Pitch,ThrOut,AccY" },
+      "CTUN", "Qhcchf",     "TimeUS,Steer,Roll,Pitch,ThrOut,AccY" },
     { LOG_NTUN_MSG, sizeof(log_Nav_Tuning),         
-      "NTUN", "IHfHHb",     "TimeMS,Yaw,WpDist,TargBrg,NavBrg,Thr" },
+      "NTUN", "QHfHHb",     "TimeUS,Yaw,WpDist,TargBrg,NavBrg,Thr" },
     { LOG_SONAR_MSG, sizeof(log_Sonar),             
-      "SONR", "IfHHHbHCb",  "TimeMS,LatAcc,S1Dist,S2Dist,DCnt,TAng,TTim,Spd,Thr" },
+      "SONR", "QfHHHbHCb",  "TimeUS,LatAcc,S1Dist,S2Dist,DCnt,TAng,TTim,Spd,Thr" },
     { LOG_STEERING_MSG, sizeof(log_Steering),             
-      "STER", "Iff",   "TimeMS,Demanded,Achieved" },
+      "STER", "Qff",   "TimeUS,Demanded,Achieved" },
 };
 
 void Rover::log_init(void)

@@ -111,7 +111,7 @@ void SITL::Log_Write_SIMSTATE(DataFlash_Class &DataFlash)
 
     struct log_AHRS pkt = {
         LOG_PACKET_HEADER_INIT(LOG_SIMSTATE_MSG),
-        time_ms : hal.scheduler->millis(),
+        time_us : hal.scheduler->micros64(),
         roll    : (int16_t)(state.rollDeg*100),
         pitch   : (int16_t)(state.pitchDeg*100),
         yaw     : (uint16_t)(wrap_360_cd(yaw*100)),
@@ -138,9 +138,9 @@ void SITL::convert_body_frame(double rollDeg, double pitchDeg,
     thetaDot = ToRad(pitchRate);
     psiDot = ToRad(yawRate);
 
-    *p = phiDot - psiDot*sinf(theta);
-    *q = cosf(phi)*thetaDot + sinf(phi)*psiDot*cosf(theta);
-    *r = cosf(phi)*psiDot*cosf(theta) - sinf(phi)*thetaDot;
+    *p = phiDot - psiDot*sin(theta);
+    *q = cos(phi)*thetaDot + sin(phi)*psiDot*cos(theta);
+    *r = cos(phi)*psiDot*cos(theta) - sin(phi)*thetaDot;
 }
 
 

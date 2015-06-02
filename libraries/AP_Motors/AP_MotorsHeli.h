@@ -68,15 +68,12 @@
 #define AP_MOTORS_HELI_RSC_MODE_SETPOINT        2       // main rotor ESC is connected to RC8 (out), desired speed is held in RSC_SETPOINT parameter
 
 // default main rotor speed (ch8 out) as a number from 0 ~ 1000
-#define AP_MOTORS_HELI_RSC_SETPOINT             500
+#define AP_MOTORS_HELI_RSC_SETPOINT             700
 
 // default main rotor ramp up time in seconds
 #define AP_MOTORS_HELI_RSC_RAMP_TIME            1       // 1 second to ramp output to main rotor ESC to full power (most people use exterrnal govenors so we can ramp up quickly)
 #define AP_MOTORS_HELI_RSC_RUNUP_TIME           10      // 10 seconds for rotor to reach full speed
 #define AP_MOTORS_HELI_TAIL_RAMP_INCREMENT      5       // 5 is 2 seconds for direct drive tail rotor to reach to full speed (5 = (2sec*100hz)/1000)
-
-// motor run-up time default in 100th of seconds
-#define AP_MOTORS_HELI_MOTOR_RUNUP_TIME         500     // 500 = 5 seconds
 
 // flybar types
 #define AP_MOTORS_HELI_NOFLYBAR                 0
@@ -116,7 +113,6 @@ public:
         _rsc_runup_increment(0.0f),
         _rotor_speed_estimate(0.0f),
         _tail_direct_drive_out(0),
-        _dt(0.01f),
         _delta_phase_angle(0)
     {
 		AP_Param::setup_object_defaults(this, var_info);
@@ -124,7 +120,7 @@ public:
         // initialise flags
         _heliflags.swash_initialised = 0;
         _heliflags.landing_collective = 0;
-        _heliflags.motor_runup_complete = 0;
+        _heliflags.rotor_runup_complete = 0;
     };
 
     // init
@@ -181,7 +177,7 @@ public:
     void set_desired_rotor_speed(int16_t desired_speed);
 
     // return true if the main rotor is up to speed
-    bool motor_runup_complete() const;
+    bool rotor_runup_complete() const;
 
     // recalc_scalers - recalculates various scalers used.  Should be called at about 1hz to allow users to see effect of changing parameters
     void recalc_scalers();
@@ -191,10 +187,7 @@ public:
 
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
-    
-    // set_dt for setting main loop rate time
-    void set_dt(float dt) { _dt = dt; }
-    
+
     // set_delta_phase_angle for setting variable phase angle compensation and force
     // recalculation of collective factors
     void set_delta_phase_angle(int16_t angle);
@@ -268,7 +261,7 @@ private:
     struct heliflags_type {
         uint8_t swash_initialised       : 1;    // true if swash has been initialised
         uint8_t landing_collective      : 1;    // true if collective is setup for landing which has much higher minimum
-        uint8_t motor_runup_complete    : 1;    // true if the rotors have had enough time to wind up
+        uint8_t rotor_runup_complete    : 1;    // true if the rotors have had enough time to wind up
     } _heliflags;
 
     // parameters
